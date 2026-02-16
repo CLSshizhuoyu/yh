@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>马年春节烟花红包</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #000;
+            overflow: hidden;
+            height: 100vh;
+            font-family: "Microsoft Yahei", sans-serif;
+            position: relative;
+        }
+
+        /* 变暗背景层 */
+        .dark-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.85);
+            z-index: 1;
+            display: none;
+        }
+
+        /* 按钮容器 */
+        .btn-container {
+            position: fixed;
+            bottom: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            opacity: 0; /* 初始隐藏，自动动画后显示 */
+            transition: opacity 0.5s;
+        }
+
+        .btn-container.show {
+            opacity: 1;
+        }
+
+        #fireBtn {
+            padding: 15px 40px;
+            font-size: 20px;
+            background-color: #e63946;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        #fireBtn:hover {
+            background-color: #d62828;
+            transform: scale(1.05);
+        }
+
+        #fireBtn.hidden {
+            display: none;
+        }
+
+        /* 烟花容器 - 包含尾焰 */
+        .firework-wrapper {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            z-index: 2;
+        }
+
+        /* 烟花升空体 */
+        .firework {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            box-shadow: 0 0 10px currentColor;
+            color: inherit;
+            position: relative;
+        }
+
+        /* 烟花尾焰效果 - 修复距离+贴合 */
+        .firework-trail {
+            position: absolute;
+            top: 2px; /* 微调至紧贴烟花（原top:0有微小间隙） */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 120px; /* 缩短尾焰长度，更贴合 */
+            background: linear-gradient(to bottom, currentColor 20%, transparent); /* 根部更实，末端透明 */
+            border-radius: 2px;
+            opacity: 0.9;
+            /* 尾焰动画 - 收缩+上移，紧贴烟花 */
+            animation: trailShrink linear forwards;
+        }
+
+        /* 修复尾焰动画：紧贴烟花，无偏移 */
+        @keyframes trailShrink {
+            0% {
+                height: 120px;
+                opacity: 0.9;
+                top: 2px; /* 始终贴烟花底部 */
+            }
+            100% {
+                height: 0px;
+                opacity: 0;
+                top: 2px; /* 取消上移，避免距离变远 */
+            }
+        }
+
+        /* 红包样式 */
+        .red-packet {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            width: 200px;
+            height: 280px;
+            background-color: #d62828;
+            border-radius: 10px;
+            z-index: 5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: gold;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+            transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .red-packet.show {
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        /* 祝福语弹窗 */
+        .blessing {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            width: 350px;
+            height: 280px;
+            background-color: white;
+            border-radius: 15px;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.8);
+            transition: transform 0.5s;
+        }
+
+        .blessing.show {
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        .blessing h2 {
+            color: #d62828;
+            margin-bottom: 20px;
+        }
+
+        .blessing p {
+            font-size: 18px;
+            line-height: 1.8;
+            color: #333;
+        }
+
+        /* 烟花粒子 */
+        .firework-particle {
+            position: absolute;
+            border-radius: 50%;
+            opacity: 1;
+            z-index: 3;
+            box-shadow: 0 0 8px currentColor;
+            color: inherit;
+        }
+    </style>
+</head>
+<body>
+    <div class="dark-overlay" id="darkOverlay"></div>
+    <div class="red-packet" id="redPacket">点击拆红包</div>
+    <div class="blessing" id="blessing">
+        <h2>马年春节快乐！</h2>
+        <p id="blessingText"></p>
+    </div>
+    <div class="btn-container" id="btnContainer">
+        <button id="fireBtn">点燃烟花</button>
+    </div>
+
+    <script>
+        var _hmt = _hmt || [];
+        (function() {
+        var hm = document.createElement("script");
+        hm.src = "https://hm.baidu.com/hm.js?60ea91010c1c868f0645090485469a5b";
+        var s = document.getElementsByTagName("script")[0]; 
+        s.parentNode.insertBefore(hm, s);
+        })();
+        // DOM元素
+        const fireBtn = document.getElementById('fireBtn');
+        const darkOverlay = document.getElementById('darkOverlay');
+        const redPacket = document.getElementById('redPacket');
+        const blessing = document.getElementById('blessing');
+        const blessingText = document.getElementById('blessingText');
+        const btnContainer = document.getElementById('btnContainer');
+
+        // 配置参数
+        const INIT_FIREWORK_COUNT = 8;    // 初始自动播放烟花数量
+        const CLICK_FIREWORK_COUNT = 20;  // 点击按钮后烟花数量（增多）
+        const INIT_ANIMATION_DURATION = 5000; // 初始自动动画时长5秒
+
+        // 祝福语库（多种类）
+        const blessingList = [
+            "龙马精神，万事顺遂；策马扬鞭，前程似锦；马到成功，阖家幸福！",
+            "金鞍迎盛世，骏马踏新春；愿您新年行大运，富贵吉祥伴终身！",
+            "马年到，福气绕，欢歌笑语乐淘淘；事业兴，身体好，阖家欢乐无烦恼！",
+            "一马平川路路通，万马奔腾事事成；龙马精神展宏图，马年大吉行大运！",
+            "春风得意马蹄疾，一日看尽长安花；愿您马年扬眉吐气，步步登高！",
+            "骏马奔腾迎新春，喜气洋洋过大年；财源滚滚如流水，平安喜乐永相伴！",
+            "马年添福气，生活有滋味；健康常相伴，好运不打烊！",
+            "策马奔腾向未来，红红火火过新年；愿您万事皆如意，年年都有好光景！"
+        ];
+
+        // 随机颜色
+        function getRandomColor() {
+            const colors = [
+                '#ff2d55', '#ffcc00', '#34c759', '#007aff', 
+                '#af52de', '#ff9500', '#ff3b30', '#ffffff'
+            ];
+            return colors[Math.floor(Math.random() * colors.length)];
+        }
+
+        // 创建单个烟花（修复高度差异+尾焰贴合）
+        function createFirework() {
+            // 1. 计算位置
+            const windowWidth = window.innerWidth;
+            const windowHeight = window.innerHeight;
+            const randomLeft = Math.random() * (windowWidth * 0.9) + (windowWidth * 0.05);
+            
+            // 修复：扩大升空高度取值范围（10% ~ 60%），让烟花高度差异明显
+            const targetBottom = Math.random() * (windowHeight * 0.5) + (windowHeight * 0.1);
+
+            // 2. 创建烟花包装器（包含烟花+尾焰）
+            const fireworkWrapper = document.createElement('div');
+            fireworkWrapper.className = 'firework-wrapper';
+            fireworkWrapper.style.left = `${randomLeft}px`;
+            fireworkWrapper.style.bottom = '0px';
+
+            // 3. 创建烟花主体
+            const fireworkColor = getRandomColor();
+            const firework = document.createElement('div');
+            firework.className = 'firework';
+            firework.style.backgroundColor = fireworkColor;
+            firework.style.color = fireworkColor;
+
+            // 4. 创建尾焰
+            const trail = document.createElement('div');
+            trail.className = 'firework-trail';
+            trail.style.color = fireworkColor;
+            // 尾焰动画时长和烟花升空时长匹配，且增加时长差异
+            const flyDuration = Math.random() * 1000 + 1200; // 1.2-2.2秒，差异更大
+            trail.style.animationDuration = `${flyDuration}ms`;
+
+            // 5. 组装
+            firework.appendChild(trail);
+            fireworkWrapper.appendChild(firework);
+            document.body.appendChild(fireworkWrapper);
+
+            // 6. 预计算绽放位置
+            const explodeX = randomLeft + 4;
+            const explodeY = windowHeight - targetBottom - 4;
+
+            // 7. 升空动画
+            const flyAnimation = fireworkWrapper.animate(
+                [
+                    { bottom: '0px', opacity: 1 },
+                    { bottom: `${targetBottom}px`, opacity: 0.9 }
+                ],
+                {
+                    duration: flyDuration,
+                    easing: 'cubic-bezier(0.1, 0.8, 0.3, 1)'
+                }
+            );
+
+            // 8. 动画结束绽放
+            flyAnimation.onfinish = () => {
+                explodeFirework(explodeX, explodeY, fireworkColor);
+                fireworkWrapper.remove();
+            };
+        }
+
+        // 烟花绽放
+        function explodeFirework(x, y, baseColor) {
+            const PARTICLE_COUNT = 120;
+            for (let i = 0; i < PARTICLE_COUNT; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'firework-particle';
+                
+                const size = Math.random() * 10 + 5;
+                particle.style.width = `${size}px`;
+                particle.style.height = `${size}px`;
+                
+                const particleColor = Math.random() > 0.3 ? baseColor : getRandomColor();
+                particle.style.backgroundColor = particleColor;
+                particle.style.color = particleColor;
+                
+                particle.style.left = `${x - size/2}px`;
+                particle.style.top = `${y - size/2}px`;
+                
+                document.body.appendChild(particle);
+
+                const angle = Math.random() * Math.PI * 2;
+                const distance = Math.random() * 150 + 80;
+                const endX = x + Math.cos(angle) * distance;
+                const endY = y + Math.sin(angle) * distance;
+
+                const explodeAnimation = particle.animate(
+                    [
+                        { transform: 'translate(0, 0)', opacity: 1 },
+                        { transform: `translate(${endX - x}px, ${endY - y}px)`, opacity: 0 }
+                    ],
+                    {
+                        duration: Math.random() * 1200 + 1500,
+                        easing: 'cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+                    }
+                );
+
+                explodeAnimation.onfinish = () => particle.remove();
+            }
+        }
+
+        // 批量创建烟花
+        function createFireworkBatch(count) {
+            let createdCount = 0;
+            const interval = setInterval(() => {
+                createFirework();
+                createdCount++;
+                if (createdCount >= count) {
+                    clearInterval(interval);
+                }
+            }, 300);
+        }
+
+        // 随机获取祝福语
+        function getRandomBlessing() {
+            const randomIndex = Math.floor(Math.random() * blessingList.length);
+            return blessingList[randomIndex];
+        }
+
+        // 页面加载后自动播放5秒烟花
+        window.onload = function() {
+            // 1. 开始自动播放初始烟花
+            createFireworkBatch(INIT_FIREWORK_COUNT);
+            
+            // 2. 5秒后显示按钮
+            setTimeout(() => {
+                btnContainer.classList.add('show');
+            }, INIT_ANIMATION_DURATION);
+        };
+
+        // 按钮点击事件
+        fireBtn.addEventListener('click', () => {
+            fireBtn.classList.add('hidden');
+            darkOverlay.style.display = 'block';
+            
+            // 点击后创建更多烟花
+            createFireworkBatch(CLICK_FIREWORK_COUNT);
+            
+            // 烟花播放完显示红包
+            setTimeout(() => {
+                redPacket.classList.add('show');
+                // 提前设置随机祝福语
+                blessingText.textContent = getRandomBlessing();
+            }, 4000);
+        });
+
+        // 红包点击事件
+        redPacket.addEventListener('click', () => {
+            redPacket.classList.remove('show');
+            blessing.classList.add('show');
+        });
+    </script>
+</body>
+</html>
